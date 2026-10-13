@@ -5,9 +5,9 @@ import cn.fuckhome.xiaowine.hook.BaseHook
 import cn.fuckhome.xiaowine.utils.LogUtils
 import cn.fuckhome.xiaowine.utils.Utils
 import cn.fuckhome.xiaowine.utils.callMethod
-import com.github.kyuubiran.ezxhelper.init.InitFields.moduleRes
-import com.github.kyuubiran.ezxhelper.utils.findMethod
-import com.github.kyuubiran.ezxhelper.utils.hookAfter
+import cn.fuckhome.xiaowine.utils.findMethod
+import cn.fuckhome.xiaowine.utils.hookAfter
+import cn.fuckhome.xiaowine.utils.moduleRes
 
 object ShortcutItemCount : BaseHook() {
     override fun init() {

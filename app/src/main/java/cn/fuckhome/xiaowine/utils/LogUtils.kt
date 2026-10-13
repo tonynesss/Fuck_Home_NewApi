@@ -23,32 +23,34 @@
 package cn.fuckhome.xiaowine.utils
 
 import android.util.Log
-import cn.fuckhome.xiaowine.utils.Utils.XConfig
-import de.robv.android.xposed.XposedBridge
 
+/**
+ * Logger used by the hook side. Messages go to the Xposed log through the modern
+ * [io.github.libxposed.api.XposedInterface.log] instead of the removed `XposedBridge`.
+ *
+ * Informational messages follow the module's `Debug` switch; errors are always logged so
+ * hook failures stay diagnosable even with debugging disabled.
+ */
 object LogUtils {
     private const val maxLength = 4000
     const val TAG = "Fuck_Home"
 
+    private fun isEnabled(): Boolean = runCatching { Utils.XConfig.getBoolean("Debug") }.getOrDefault(false)
 
-    private fun log(obj: Any?, toXposed: Boolean = false, toLogd: Boolean = false) {
-        if (!XConfig.getBoolean("Debug")) return
+    private fun log(obj: Any?, toXposed: Boolean = false, toLogd: Boolean = false, force: Boolean = false) {
+        if (!force && !isEnabled()) return
         val content = if (obj is Throwable) Log.getStackTraceString(obj) else obj.toString()
         if (content.length > maxLength) {
             val chunkCount = content.length / maxLength
             for (i in 0..chunkCount) {
-                val max = 4000 * (i + 1)
-                if (max >= content.length) {
-                    if (toXposed) XposedBridge.log("$TAG: " + content.substring(maxLength * i))
-                    if (toLogd) Log.d(TAG, content.substring(maxLength * i))
-                } else {
-                    if (toXposed) XposedBridge.log("$TAG: " + content.substring(maxLength * i, max))
-                    if (toLogd) Log.d(TAG, content.substring(maxLength * i, max))
-                }
+                val max = maxLength * (i + 1)
+                val chunk = if (max >= content.length) content.substring(maxLength * i) else content.substring(maxLength * i, max)
+                if (toXposed) HookEnv.log(Log.INFO, TAG, "$TAG: $chunk")
+                if (toLogd) Log.i(TAG, chunk)
             }
         } else {
-            if (toXposed) XposedBridge.log("$TAG: $content")
-            if (toLogd) Log.d(TAG, content)
+            if (toXposed) HookEnv.log(Log.INFO, TAG, "$TAG: $content")
+            if (toLogd) Log.i(TAG, content)
         }
     }
 
@@ -56,4 +58,12 @@ object LogUtils {
         log(obj, toXposed = true)
     }
 
+    /** Always logged, regardless of the module's `Debug` switch. */
+    fun e(obj: Any?) {
+        log(obj, toXposed = true, toLogd = true, force = true)
+    }
+
+    fun d(obj: Any?) {
+        log(obj, toLogd = true)
+    }
 }

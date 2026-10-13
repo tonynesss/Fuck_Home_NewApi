@@ -1,22 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          package="cn.fuckhome.xiaowine">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+      Note: the modern Xposed service provider
+      (io.github.libxposed.service.XposedProvider, authority ${applicationId}.XposedService)
+      is contributed by the io.github.libxposed:service artifact's own manifest and is merged
+      in automatically. Do not declare it again here — a duplicate provider fails the merge.
+    -->
     <application
+            android:name=".App"
             android:icon="@mipmap/ic_launcher"
             android:label="@string/AppName"
+            android:description="@string/XposedDesc"
             android:roundIcon="@mipmap/ic_launcher">
 
         <activity
                 android:name=".activity.SettingsActivity"
                 android:exported="true"
-                android:theme="@style/AppTheme">
+                android:theme="@style/AppTheme"
+                android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
-                <action android:name="miui.cn.fkj233.xposed.statusbarlyric.SettingsFragment"/>
                 <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES"/>
 
                 <category android:name="android.intent.category.DEFAULT"/>
+                <!-- Lets the Xposed framework open this module's settings screen. -->
                 <category android:name="de.robv.android.xposed.category.MODULE_SETTINGS"/>
             </intent-filter>
         </activity>
@@ -31,22 +39,6 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity-alias>
-
-        <meta-data
-                android:name="xposedsharedprefs"
-                android:value="true"/>
-        <meta-data
-                android:name="xposedmodule"
-                android:value="true"/>
-        <meta-data
-                android:name="xposedminversion"
-                android:value="93"/>
-        <meta-data
-                android:name="xposedscope"
-                android:resource="@array/xposedscope"/>
-        <meta-data
-                android:name="xposeddescription"
-                android:value="@string/XposedDesc"/>
     </application>
 
 </manifest>

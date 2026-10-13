@@ -15,9 +15,9 @@ import cn.fuckhome.xiaowine.utils.getStaticObjectField
 import cn.fuckhome.xiaowine.utils.hookAfterAllMethods
 import cn.fuckhome.xiaowine.utils.hookBeforeMethod
 import cn.fuckhome.xiaowine.utils.setStaticObjectField
-import com.github.kyuubiran.ezxhelper.init.InitFields.appContext
-import com.github.kyuubiran.ezxhelper.init.InitFields.moduleRes
-import de.robv.android.xposed.XposedHelpers
+import cn.fuckhome.xiaowine.utils.appContext
+import cn.fuckhome.xiaowine.utils.moduleRes
+import cn.fuckhome.xiaowine.utils.newInstance
 
 @SuppressLint("StaticFieldLeak", "DiscouragedApi")
 object ShortcutSmallWindow : BaseHook() {
@@ -65,7 +65,7 @@ object ShortcutSmallWindow : BaseHook() {
         mSystemShortcutMenuItem.hookAfterAllMethods("createAllSystemShortcutMenuItems") {
             @Suppress("UNCHECKED_CAST")
             val mAllSystemShortcutMenuItems = mSystemShortcutMenuItem.getStaticObjectField("sAllSystemShortcutMenuItems") as Collection<Any>
-            val mSmallWindowInstance = XposedHelpers.newInstance(mAppDetailsShortcutMenuItem)
+            val mSmallWindowInstance = mAppDetailsShortcutMenuItem.newInstance()
             mSmallWindowInstance.callMethod("setShortTitle", moduleRes.getString(R.string.SmallWindow))
             val isDarkMode =
                 appContext.applicationContext.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES

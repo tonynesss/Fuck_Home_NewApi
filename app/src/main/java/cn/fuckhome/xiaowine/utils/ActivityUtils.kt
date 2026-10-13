@@ -20,34 +20,31 @@
  * <https://github.com/577fkj/StatusBarLyric/blob/main/LICENSE>.
  */
 
-package cn.aodlyric.xiaowine.utils
-
+package cn.fuckhome.xiaowine.utils
 
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import app.xiaowine.xtoast.XToast
-import cn.fuckhome.xiaowine.R
+import android.widget.Toast
 
 object ActivityUtils {
     private val handler by lazy { Handler(Looper.getMainLooper()) }
 
-    // 弹出toast
-    @Suppress("DEPRECATION")
     fun showToastOnLooper(context: Context, message: String) {
-        try {
-            handler.post { //                XToast.makeToast(context, message, toastIcon =context.resources.getDrawable(R.mipmap.ic_launcher_round)).show()
-                XToast.makeText(context, message, toastIcon = context.resources.getDrawable(R.mipmap.ic_launcher)).show()
+        handler.post {
+            runCatching {
+                Toast.makeText(context.applicationContext, message, Toast.LENGTH_SHORT).show()
             }
-        } catch (e: RuntimeException) {
-            e.printStackTrace()
         }
     }
 
     fun openUrl(context: Context, url: String) {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        runCatching {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }.onFailure {
+            showToastOnLooper(context, "无法打开链接: $url")
+        }
     }
-
 }

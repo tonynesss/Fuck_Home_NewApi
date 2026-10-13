@@ -1,432 +1,224 @@
 package cn.fuckhome.xiaowine.activity
 
 import android.annotation.SuppressLint
-import android.content.*
+import android.content.BroadcastReceiver
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.view.Gravity
-import cn.aodlyric.xiaowine.utils.ActivityUtils
-import cn.fkj233.ui.activity.MIUIActivity
-import cn.fkj233.ui.activity.view.SpinnerV
-import cn.fkj233.ui.activity.view.TextV
-import cn.fkj233.ui.dialog.MIUIDialog
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.mutableStateOf
 import cn.fuckhome.xiaowine.BuildConfig
 import cn.fuckhome.xiaowine.R
-import cn.fuckhome.xiaowine.utils.ActivityOwnSP.ownSPConfig as config
-import cn.fuckhome.xiaowine.utils.ActivityOwnSP
+import cn.fuckhome.xiaowine.ui.ScreenMessage
+import cn.fuckhome.xiaowine.ui.SettingsScreen
+import cn.fuckhome.xiaowine.ui.theme.AppTheme
+import cn.fuckhome.xiaowine.utils.ActivityUtils
 import cn.fuckhome.xiaowine.utils.BackupUtils
 import cn.fuckhome.xiaowine.utils.FileUtils
-import cn.fuckhome.xiaowine.utils.Utils
-import cn.fuckhome.xiaowine.utils.Utils.isNotNull
+import cn.fuckhome.xiaowine.utils.ModulePrefs
 import com.jaredrummler.ktsh.Shell
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 import kotlin.system.exitProcess
 
-class SettingsActivity : MIUIActivity() {
-    private val activity = this
-    private val openFontFile = 1511
+/** How long the settings screen waits for the framework's service binder at start-up. */
+private const val SERVICE_BIND_TIMEOUT_MS = 3000L
 
-    init {
-        initView {
-            registerMain(getString(R.string.AppName), false) {
-                TextS(textId = R.string.MainSwitch, key = "MainSwitch")
-                Line()
-                TextA(textId = R.string.AddInformation, onClickListener = { showFragment("AddInformation") })
-                TextA(textId = R.string.AddInformationStyle, onClickListener = { showFragment("AddInformationStyle") })
-                Line()
-                TextA(textId = R.string.FunModify, onClickListener = { showFragment("Unrestricted") })
-                Line()
-                TextA(textId = R.string.About, onClickListener = { showFragment("About") })
-                Text()
-            }
-            registerMenu(getString(R.string.Menu)) {
-                TextS(textId = R.string.HideDeskIcon, key = "hLauncherIcon", onClickListener = {
-                    packageManager.setComponentEnabledSetting(ComponentName(activity, "${BuildConfig.APPLICATION_ID}.launcher"), if (it) {
-                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                    } else {
-                        PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                    }, PackageManager.DONT_KILL_APP)
-                })
-                TextS(textId = R.string.DebugMode, key = "Debug")
-                TextA(textId = R.string.ResetModule, onClickListener = {
-                    MIUIDialog(activity) {
-                        setTitle(R.string.ResetModuleDialog)
-                        setMessage(R.string.ResetModuleDialogTips)
-                        setLButton(R.string.Ok) {
-                            config.clear()
-                            ActivityUtils.showToastOnLooper(activity, activity.getString(R.string.ResetSuccess))
-                            activity.finishActivity(0)
-                            dismiss()
-                        }
-                        setRButton(R.string.Cancel) { dismiss() }
-                    }.show()
-                })
-                TextA(textId = R.string.ReStartHome, onClickListener = {
-                    Thread { Shell("su").run("am force-stop com.miui.home") }.start()
-                })
-                TextA(textId = R.string.Backup, onClickListener = { BackupUtils.backup(activity, ActivityOwnSP.ownSP) })
-                TextA(textId = R.string.Recovery, onClickListener = { BackupUtils.recovery(activity, ActivityOwnSP.ownSP) })
-                Line()
-                TextSummary(textId = R.string.ModulePackName, tips = BuildConfig.APPLICATION_ID)
-                TextSummary(textId = R.string.ModuleVersion, tips = "${BuildConfig.VERSION_NAME}(${BuildConfig.VERSION_CODE})-${BuildConfig.BUILD_TYPE}")
-                val buildTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(BuildConfig.BUILD_TIME.toLong())
-                TextSummary(textId = R.string.BuildTime, tips = buildTime)
-                Text()
-            }
-            register("About", getString(R.string.About), true) {
-                TitleText(textId = R.string.Author)
-                Author(getDrawable(R.drawable.header_xiaowine)!!, "xiaowine", getString(R.string.AboutTips), onClickListener = { ActivityUtils.openUrl(activity, "https://github.com/xiaowine") })
-                TextA("Coolapk", onClickListener = {
-                    ActivityUtils.openUrl(activity, "https://www.coolapk.com/apk/cn.fuckhome.xiaowine")
-                })
-                Line()
-                TextWithSpinner(TextV(textId = R.string.ThkListTips), SpinnerV("") {
-                    add("Xposed") { ActivityUtils.openUrl(activity, "https://github.com/rovo89/Xposed") }
-                    add("LSPosed") { ActivityUtils.openUrl(activity, "https://github.com/LSPosed/LSPosed") }
-                    add("blockmiui") { ActivityUtils.openUrl(activity, "https://github.com/Block-Network/blockmiui") }
-                    add("EzXHelper") { ActivityUtils.openUrl(activity, "https://github.com/KyuubiRan/EzXHelper") }
-                })
-                Text()
-            }
-            register("AddInformation", getString(R.string.AddInformation), false) {
-                TextS(textId = R.string.Memory, key = "MemoryView")
-                TextS(textId = R.string.Zarm, key = "ZarmView")
-                TextS(textId = R.string.Storage, key = "StorageView")
-                TextS(textId = R.string.Uptime, key = "Uptime")
-                TextS(textId = R.string.RunningAppTotal, key = "RunningAppTotal")
-                TextS(textId = R.string.RunningServiceTotal, key = "RunningServiceTotal")
-                TextS(textId = R.string.warning, key = "Warning")
-                TextS(textId = R.string.CleanMode, key = "CleanMode")
-            }
-            register("AddInformationStyle", getString(R.string.AddInformationStyle), false) {
-                TextA(textId = R.string.Color, onClickListener = {
-                    MIUIDialog(activity) {
-                        setTitle(R.string.Color)
-                        setMessage(R.string.LyricColorTips)
-                        setEditText(config.getColor(), "")
-                        setRButton(R.string.Ok) {
-                            if (getEditText().isNotEmpty()) {
-                                try {
-                                    Color.parseColor(getEditText())
-                                    config.setColor(getEditText())
-                                    dismiss()
-                                    return@setRButton
-                                } catch (_: Throwable) {
-                                }
-                            }
-                            ActivityUtils.showToastOnLooper(activity, getString(R.string.LyricColorError))
-                            config.setColor("")
-                            dismiss()
-                        }
-                        setLButton(R.string.Cancel) { dismiss() }
-                    }.show()
-                })
-                TextA(textId = R.string.BackgroundColor, onClickListener = {
-                    MIUIDialog(activity) {
-                        setTitle(R.string.BackgroundColor)
-                        setMessage(R.string.LyricColorTips)
-                        setEditText(config.getBgColor(), "#00000000")
-                        setRButton(R.string.Ok) {
-                            if (getEditText().isNotEmpty()) {
-                                try {
-                                    Color.parseColor(getEditText())
-                                    config.setBgColor(getEditText())
-                                    dismiss()
-                                    return@setRButton
-                                } catch (_: Throwable) {
-                                }
-                            }
-                            ActivityUtils.showToastOnLooper(activity, getString(R.string.LyricColorError))
-                            config.setBgColor("#00000000")
-                            dismiss()
-                        }
-                        setLButton(R.string.Cancel) { dismiss() }
-                    }.show()
-                })
-                TextA(textId = R.string.BgCorners, onClickListener = {
-                    MIUIDialog(activity) {
-                        setTitle(R.string.BgCorners)
-                        setMessage(R.string.BgCornersTips)
-                        setEditText(config.getBgCorners().toString(), "0")
-                        setRButton(R.string.Ok) {
-                            if (getEditText().isNotEmpty()) {
-                                try {
-                                    val value = getEditText().toInt()
-                                    if (value in (0..100)) {
-                                        config.setBgCorners(value)
-                                        dismiss()
-                                        return@setRButton
-                                    }
-                                } catch (_: Throwable) {
-                                }
-                            }
-                            ActivityUtils.showToastOnLooper(activity, getString(R.string.InputError))
-                            config.setBgCorners(0)
-                            dismiss()
-                        }
-                        setLButton(R.string.Cancel) { dismiss() }
-                    }.show()
-                })
-                TextA(textId = R.string.CustomFont, onClickListener = {
-                    MIUIDialog(activity) {
-                        setTitle(R.string.CustomFont)
-                        setRButton(R.string.ChooseFont) {
-                            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
-                            intent.addCategory(Intent.CATEGORY_OPENABLE)
-                            intent.type = "*/*"
-                            intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false)
-                            startActivityForResult(intent, openFontFile)
-                            dismiss()
-                        }
-                        setLButton(R.string.Reset) {
-                            application.sendBroadcast(Intent().apply {
-                                action = "MIUIHOME_Server"
-                                putExtra("Type", "delete_font")
-                            })
-                            dismiss()
-                        }
-                    }.show()
-                })
-                val dict: HashMap<Int, String> = hashMapOf()
-                dict[Gravity.CENTER] = getString(R.string.CENTER)
-                dict[Gravity.START] = getString(R.string.START)
-                dict[Gravity.END] = getString(R.string.END)
-                TextWithSpinner(TextV(textId = R.string.Gravity), SpinnerV(dict[Gravity.START]!!) {
-                    dict.forEach { (key, value) -> add(value) { config.setGravity(key) } }
-                })
-                var marginTips = if (config.getUnit()) R.string.MarginTips1 else R.string.MarginTips2
-                var marginRange = if (config.getUnit()) (-100..100) else (-2000..2000)
-                val unit: HashMap<Boolean, String> = hashMapOf()
-                unit[true] = getString(R.string.Scale)
-                unit[false] = getString(R.string.Pixel)
-                TextWithSpinner(TextV(textId = R.string.UnitMargin), SpinnerV(unit[config.getUnit()]!!) {
-                    unit.forEach { (key, value) ->
-                        add(value) {
-                            config.setUnit(key)
-                            marginTips = if (config.getUnit()) R.string.MarginTips1 else R.string.MarginTips2
-                            marginRange = if (config.getUnit()) (-100..100) else (-2000..2000)
-                        }
-                    }
-                })
+private const val MIUI_HOME_ACTION = "MIUIHOME_Server"
+private const val MIUI_HOME_CALLBACK_ACTION = "MIUIHOME_App_Server"
 
-                TextA(textId = R.string.LeftMargin0, onClickListener = {
-                    MIUIDialog(activity) {
-                        setTitle(R.string.LeftMargin0)
-                        setMessage(marginTips)
-                        setEditText(config.getInt("LeftMargin0").toString(), "0")
-                        setRButton(R.string.Ok) {
-                            if (getEditText().isNotEmpty()) {
-                                try {
-                                    val value = getEditText().toInt()
-                                    if (value in marginRange) {
-                                        config.setValue("LeftMargin0", value)
-                                        dismiss()
-                                        return@setRButton
-                                    }
-                                } catch (_: Throwable) {
-                                }
-                            }
-                            ActivityUtils.showToastOnLooper(activity, getString(R.string.InputError))
-                            config.setValue("LeftMargin0", 0)
-                            dismiss()
-                        }
-                        setLButton(R.string.Cancel) { dismiss() }
-                    }.show()
-                })
-                TextA(textId = R.string.TopMargin0, onClickListener = {
-                    MIUIDialog(activity) {
-                        setTitle(R.string.TopMargin0)
-                        setMessage(marginTips)
-                        setEditText(config.getInt("TopMargin0", 4).toString(), "0")
-                        setRButton(R.string.Ok) {
-                            if (getEditText().isNotEmpty()) {
-                                try {
-                                    val value = getEditText().toInt()
-                                    if (value in marginRange) {
-                                        config.setValue("TopMargin0", value)
-                                        dismiss()
-                                        return@setRButton
-                                    }
-                                } catch (_: Throwable) {
-                                }
-                            }
-                            ActivityUtils.showToastOnLooper(activity, getString(R.string.InputError))
-                            config.setValue("TopMargin0", 0)
-                            dismiss()
-                        }
-                        setLButton(R.string.Cancel) { dismiss() }
-                    }.show()
-                })
-                TextA(textId = R.string.LeftMargin1, onClickListener = {
-                    MIUIDialog(activity) {
-                        setTitle(R.string.LeftMargin1)
-                        setMessage(marginTips)
-                        setEditText(config.getInt("LeftMargin1").toString(), "0")
-                        setRButton(R.string.Ok) {
-                            if (getEditText().isNotEmpty()) {
-                                try {
-                                    val value = getEditText().toInt()
-                                    if (value in marginRange) {
-                                        config.setValue("LeftMargin1", value)
-                                        dismiss()
-                                        return@setRButton
-                                    }
-                                } catch (_: Throwable) {
-                                }
-                            }
-                            ActivityUtils.showToastOnLooper(activity, getString(R.string.InputError))
-                            config.setValue("LeftMargin1", 0)
-                            dismiss()
-                        }
-                        setLButton(R.string.Cancel) { dismiss() }
-                    }.show()
-                })
-                TextA(textId = R.string.TopMargin1, onClickListener = {
-                    MIUIDialog(activity) {
-                        setTitle(R.string.TopMargin1)
-                        setMessage(marginTips)
-                        setEditText(config.getInt("TopMargin1", 4).toString(), "0")
-                        setRButton(R.string.Ok) {
-                            if (getEditText().isNotEmpty()) {
-                                try {
-                                    val value = getEditText().toInt()
-                                    if (value in marginRange) {
-                                        config.setValue("TopMargin1", value)
-                                        dismiss()
-                                        return@setRButton
-                                    }
-                                } catch (_: Throwable) {
-                                }
-                            }
-                            ActivityUtils.showToastOnLooper(activity, getString(R.string.InputError))
-                            config.setValue("TopMargin1", 0)
-                            dismiss()
-                        }
-                        setLButton(R.string.Cancel) { dismiss() }
-                    }.show()
-                })
+class SettingsActivity : ComponentActivity() {
+
+    private val message = mutableStateOf<ScreenMessage?>(null)
+
+    private var appReceiver: BroadcastReceiver? = null
+
+    private val openFont = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@registerForActivityResult
+        val path = runCatching { FileUtils(this).getFilePathByUri(uri) }.getOrNull()
+        if (path.isNullOrEmpty()) {
+            ActivityUtils.showToastOnLooper(this, getString(R.string.CustomFontFail))
+            return@registerForActivityResult
+        }
+        sendBroadcast(
+            Intent(MIUI_HOME_ACTION).apply {
+                putExtra("Type", "copy_font")
+                putExtra("Font_Path", path)
             }
-            register("Unrestricted", getString(R.string.FunModify), false) {
-                TextS(textId = R.string.Pad, key = "Pad")
-                TextS(textId = R.string.Shortcuts, key = "Shortcuts")
-                TextS(textId = R.string.UnlockGrids, key = "UnlockGrids")
-                TextS(textId = R.string.UnlockHotseat, key = "UnlockHotseat")
-                TextS(textId = R.string.ShortcutSmallWindow, key = "ShortcutSmallWindow")
-                TextS(textId = R.string.HideStatusBar, key = "HideStatusBar")
-                TextS(textId = R.string.HideAppName, key = "HideAppName")
-                TextS(textId = R.string.HideAppIcon, key = "HideAppIcon")
-                TextS(textId = R.string.HideSmallWindow, key = "HideSmallWindow")
-                TextS(textId = R.string.RemoveSmallWindowRestriction, key = "RemoveSmallWindowRestriction")
-                TextS(textId = R.string.UnlockNavType, key = "UnlockNavType")
+        )
+    }
+
+    private val createBackup =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+            uri ?: return@registerForActivityResult
+            val error = BackupUtils.write(this, uri, ModulePrefs.preferences())
+            ActivityUtils.showToastOnLooper(this, error ?: "save ok")
+        }
+
+    private val openBackup =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri ?: return@registerForActivityResult
+            val error = BackupUtils.read(this, uri, ModulePrefs.preferences())
+            ActivityUtils.showToastOnLooper(this, error ?: "load ok")
+        }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        applyEdgeToEdge()
+        seedDebugDefaults()
+        registerAppReceiver()
+        setContent {
+            AppTheme {
+                SettingsScreen(
+                    message = message.value,
+                    onDismissMessage = { message.value = null },
+                    onRestartApp = ::restartApp,
+                    onPickFont = { openFont.launch(arrayOf("*/*")) },
+                    onBackup = { createBackup.launch(defaultBackupName()) },
+                    onRecovery = { openBackup.launch(arrayOf("application/json")) },
+                    onRestartHome = ::restartHome,
+                    onHideLauncherIcon = ::setLauncherIconHidden,
+                )
             }
+        }
+        verifyFrameworkAsync()
+    }
+
+    /**
+     * Draws the UI behind the status bar and the gesture bar ("小白条") with fully transparent
+     * system bars, so the Miuix surface shows through and the layout reads as immersive.
+     *
+     * `SystemBarStyle.auto` picks the light/dark icon tint from the configuration, which is
+     * exactly what [cn.fuckhome.xiaowine.ui.theme.AppTheme] follows, so no recomposition-time
+     * effect is needed. HyperOS enforces a translucent navigation-bar scrim by default; it is
+     * turned off explicitly (the same workaround KernelSU and Miuix use).
+     */
+    private fun applyEdgeToEdge() {
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (data.isNotNull() && resultCode == RESULT_OK) {
-            when (requestCode) {
-                BackupUtils.CREATE_DOCUMENT_CODE -> {
-                    BackupUtils.handleCreateDocument(activity, data!!.data)
-                }
+    override fun onDestroy() {
+        appReceiver?.let { runCatching { unregisterReceiver(it) } }
+        appReceiver = null
+        super.onDestroy()
+    }
 
-                BackupUtils.OPEN_DOCUMENT_CODE -> {
-                    BackupUtils.handleReadDocument(activity, data!!.data)
-                }
-
-                openFontFile -> {
-                    data!!.data?.let {
-                        activity.sendBroadcast(Intent().apply {
-                            action = "MIUIHOME_Server"
-                            putExtra("Type", "copy_font")
-                            putExtra("Font_Path", FileUtils(activity).getFilePathByUri(it))
-                        })
+    /**
+     * The framework hands its service binder to this process right after it starts. When the
+     * binder never arrives the module is not active, so the settings could never reach the
+     * launcher; the user is told instead of silently losing their changes.
+     */
+    private fun verifyFrameworkAsync() {
+        Thread {
+            if (!ModulePrefs.awaitService(SERVICE_BIND_TIMEOUT_MS) && !isFinishing) {
+                runOnUiThread {
+                    if (!isFinishing) {
+                        message.value = ScreenMessage(getString(R.string.NotSupport), restart = true)
                     }
                 }
             }
-        }
+        }.start()
     }
-
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
-    override fun onCreate(savedInstanceState: Bundle?) {
-        ActivityOwnSP.activity = this
-        if (!checkLSPosed()) isLoad = false
-        super.onCreate(savedInstanceState)
-        if (isLoad) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(AppReceiver(), IntentFilter().apply { addAction("MIUIHOME_App_Server") }, RECEIVER_NOT_EXPORTED)
-            }else{
-                registerReceiver(AppReceiver(), IntentFilter().apply { addAction("MIUIHOME_App_Server") })
-            }
-            if (BuildConfig.DEBUG) {
-                config.setValue("MemoryView", true)
-                config.setValue("ZarmView", true)
-                config.setValue("MainSwitch", true)
-                config.setValue("Debug", true)
-            }
-        }
-    }
-
-    private fun checkLSPosed(): Boolean {
-        return try {
-            Utils.getSP(this, "Fuck_Home_Config")?.let { setSP(it) }
-            true
-        } catch (e: Exception) {
-            e.printStackTrace()
-            MIUIDialog(activity) {
-                setTitle(R.string.Tips)
-                setMessage(R.string.NotSupport)
-                setRButton(R.string.Restart) {
-                    val intent = packageManager.getLaunchIntentForPackage(packageName)
-                    intent!!.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    startActivity(intent)
-                    exitProcess(0)
-                }
-                setCancelable(false)
-            }.show()
-            false
-        }
-    }
-
-    inner class AppReceiver : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            try {
-                Handler(Looper.getMainLooper()).post {
-                    when (intent.getStringExtra("app_Type")) {
-                        "CopyFont" -> {
-                            val message: String = if (intent.getBooleanExtra("CopyFont", false)) {
-                                getString(R.string.CustomFontSuccess)
-                            } else {
-                                getString(R.string.CustomFontFail) + "\n" + intent.getStringExtra("font_error")
-                            }
-                            MIUIDialog(activity) {
-                                setTitle(getString(R.string.CustomFont))
-                                setMessage(message)
-                                setRButton(getString(R.string.Ok)) { dismiss() }
-                            }.show()
-                        }
-
-                        "DeleteFont" -> {
-                            val message: String = if (intent.getBooleanExtra("DeleteFont", false)) {
-                                getString(R.string.DeleteFontSuccess)
-                            } else {
-                                getString(R.string.DeleteFontFail)
-                            }
-                            MIUIDialog(activity) {
-                                setTitle(getString(R.string.DeleteFont))
-                                setMessage(message)
-                                setRButton(getString(R.string.Ok)) { dismiss() }
-                            }.show()
-                        }
+    private fun registerAppReceiver() {
+        if (appReceiver != null) return
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val text = when (intent.getStringExtra("app_Type")) {
+                    "CopyFont" -> if (intent.getBooleanExtra("CopyFont", false)) {
+                        getString(R.string.CustomFontSuccess)
+                    } else {
+                        getString(R.string.CustomFontFail) + "\n" + intent.getStringExtra("font_error")
                     }
+
+                    "DeleteFont" -> if (intent.getBooleanExtra("DeleteFont", false)) {
+                        getString(R.string.DeleteFontSuccess)
+                    } else {
+                        getString(R.string.DeleteFontFail)
+                    }
+
+                    else -> null
                 }
-            } catch (_: Throwable) {
+                if (text != null) message.value = ScreenMessage(text)
             }
         }
+        val filter = IntentFilter(MIUI_HOME_CALLBACK_ACTION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(receiver, filter)
+        }
+        appReceiver = receiver
     }
+
+    /** Pre-fills a few switches in debug builds so the recents panel is easy to test. */
+    private fun seedDebugDefaults() {
+        if (!BuildConfig.DEBUG) return
+        ModulePrefs.preferences().edit()
+            .putBoolean("MemoryView", true)
+            .putBoolean("ZarmView", true)
+            .putBoolean("MainSwitch", true)
+            .putBoolean("Debug", true)
+            .apply()
+    }
+
+    private fun setLauncherIconHidden(hidden: Boolean) {
+        packageManager.setComponentEnabledSetting(
+            ComponentName(this, "$packageName.launcher"),
+            if (hidden) {
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            } else {
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            },
+            PackageManager.DONT_KILL_APP,
+        )
+    }
+
+    /**
+     * Restarting the launcher needs root: MiuiHome lives in its own process and a module app cannot
+     * stop another app without it.
+     *
+     * `su` may be missing or denied; [com.jaredrummler.ktsh.Shell] throws
+     * `Shell.NotFoundException` from its constructor in that case. That used to escape this worker
+     * thread and kill the process, so the outcome is always captured and reported instead.
+     */
+    private fun restartHome() {
+        Thread {
+            val succeeded = runCatching { Shell("su").run("am force-stop com.miui.home").isSuccess }
+                .getOrDefault(false)
+            if (!succeeded && !isFinishing) {
+                runOnUiThread {
+                    if (!isFinishing) message.value = ScreenMessage(getString(R.string.RootRequired))
+                }
+            }
+        }.start()
+    }
+
+    private fun restartApp() {
+        packageManager.getLaunchIntentForPackage(packageName)?.let {
+            it.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            startActivity(it)
+        }
+        exitProcess(0)
+    }
+
+    private fun defaultBackupName(): String =
+        "Fuck_Home_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())}.json"
 }

@@ -6,6 +6,8 @@
     <string name="AddInformationStyle">Customizing the style</string>
     <string name="AppName">Fuck•MiuiHome</string>
     <string name="Author">Author</string>
+    <string name="OriginalAuthor">Original author</string>
+    <string name="Maintainer">Maintainer</string>
     <string name="BackgroundColor">Background color and transparency</string>
     <string name="Backup">Save Settings</string>
     <string name="BgCorners">Rounded corners of the background</string>
@@ -57,6 +59,8 @@ This module only supports the latest version of LSPosed</string>
     <string name="Pad">Remove the restriction of the tablet mode (MiuiHome Pad)</string>
     <string name="Pixel">Pixels</string>
     <string name="ReStartHome">Restart the desktop</string>
+    <string name="NeedsRoot">Requires root</string>
+    <string name="RootRequired">Restarting the desktop requires root permission</string>
     <string name="Recovery">Restoring Settings</string>
     <string name="Reset">Reset Settings</string>
     <string name="ResetModule">Resetting the module</string>

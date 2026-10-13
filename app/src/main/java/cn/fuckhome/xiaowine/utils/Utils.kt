@@ -3,22 +3,25 @@
 package cn.fuckhome.xiaowine.utils
 
 import android.annotation.SuppressLint
-import android.content.Context
-import android.content.SharedPreferences
 import android.graphics.Color
 import android.os.SystemClock
 import android.text.format.Formatter
 import android.util.Log
 import android.widget.TextView
-import cn.fuckhome.xiaowine.BuildConfig
 import cn.fuckhome.xiaowine.config.Config
 import cn.fuckhome.xiaowine.hook.module.add.Info
-import com.github.kyuubiran.ezxhelper.init.InitFields.appContext
-import de.robv.android.xposed.XSharedPreferences
 
 
 object Utils {
-    val XConfig: Config by lazy { Config(getPref("Fuck_Home_Config")) }
+    /** Remote preference group shared between the settings UI and the hooked processes. */
+    const val PREF_NAME = "Fuck_Home_Config"
+
+    /**
+     * Hook side configuration. Backed by the framework's remote preferences, which are
+     * read-only inside the hooked app. When the framework has no remote capability every
+     * lookup falls back to its default value (see [Config]).
+     */
+    val XConfig: Config by lazy { Config(HookEnv.remotePreferences(PREF_NAME)) }
 
 
     fun viewColor(view: TextView, info: MemoryUtils?) {
@@ -32,16 +35,6 @@ object Utils {
             }
 
         }
-    }
-
-    fun getPref(key: String?): XSharedPreferences? {
-        val pref = XSharedPreferences(BuildConfig.APPLICATION_ID, key)
-        return if (pref.file.canRead()) pref else null
-    }
-
-    @SuppressLint("WorldReadableFiles")
-    fun getSP(context: Context, key: String?): SharedPreferences? {
-        return context.createDeviceProtectedStorageContext().getSharedPreferences(key, Context.MODE_WORLD_READABLE)
     }
 
     object Uptime {
@@ -90,4 +83,8 @@ object Utils {
     fun Any?.isNull() = this == null
 
     fun Any?.isNotNull() = this != null
+
+    /** The settings UI preferences: local storage mirrored into the remote store. */
+    @SuppressLint("WorldReadableFiles")
+    fun preferences() = ModulePrefs.preferences()
 }

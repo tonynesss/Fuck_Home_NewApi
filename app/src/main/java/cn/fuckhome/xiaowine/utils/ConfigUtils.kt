@@ -22,75 +22,38 @@
 
 package cn.fuckhome.xiaowine.utils
 
-import android.annotation.SuppressLint
 import android.content.SharedPreferences
-import cn.fuckhome.xiaowine.utils.Utils.isNull
-import de.robv.android.xposed.XSharedPreferences
 
-class ConfigUtils {
-    private var xSP: XSharedPreferences? = null
-    private var mSP: SharedPreferences? = null
-    private var mSPEditor: SharedPreferences.Editor? = null
+/**
+ * Thin wrapper around a [SharedPreferences] instance.
+ *
+ * The legacy `XSharedPreferences` backend is gone: the settings UI uses the mirrored
+ * local/remote store and the hooks read the framework's remote preferences. A `null`
+ * store simply yields the supplied default for every read.
+ */
+class ConfigUtils(private val sp: SharedPreferences?) {
 
-    constructor(xSharedPreferences: XSharedPreferences?) {
-        xSP = xSharedPreferences
-        mSP = xSharedPreferences
+    /** Remote preferences are refreshed by the framework, nothing to reload locally. */
+    fun update() = Unit
+
+    fun put(key: String?, value: Any?) {
+        if (key == null) return
+        val editor = sp?.edit() ?: return
+        editor.putValue(key, value)
+        editor.apply()
     }
 
-    @SuppressLint("CommitPrefEdits")
-    constructor(sharedPreferences: SharedPreferences) {
-        mSP = sharedPreferences
-        mSPEditor = sharedPreferences.edit()
-    }
+    fun optInt(key: String, def: Int): Int = runCatching { sp?.getInt(key, def) ?: def }.getOrDefault(def)
 
-    fun update() {
-        if (xSP.isNull()) {
-            xSP = Utils.getPref("Fuck_Home_Config")
-            mSP = xSP
-            return
-        }
-        xSP?.reload()
-    }
+    fun optBoolean(key: String, def: Boolean): Boolean =
+        runCatching { sp?.getBoolean(key, def) ?: def }.getOrDefault(def)
 
-    fun put(key: String?, any: Any) {
-        when (any) {
-            is Int -> mSPEditor?.putInt(key, any)
-            is String -> mSPEditor?.putString(key, any)
-            is Boolean -> mSPEditor?.putBoolean(key, any)
-            is Float -> mSPEditor?.putFloat(key, any)
-        }
-        mSPEditor?.apply()
-    }
+    fun optString(key: String, def: String): String =
+        runCatching { sp?.getString(key, def) ?: def }.getOrDefault(def)
 
-    fun optInt(key: String, i: Int): Int {
-        if (mSP.isNull()) {
-            return i
-        }
-        return mSP!!.getInt(key, i)
-    }
-
-    fun optBoolean(key: String, bool: Boolean): Boolean {
-        if (mSP.isNull()) {
-            return bool
-        }
-        return mSP!!.getBoolean(key, bool)
-    }
-
-    fun optString(key: String, str: String): String {
-        if (mSP.isNull()) {
-            return str
-        }
-        return mSP!!.getString(key, str).toString()
-    }
-
-    fun optFloat(key: String, f: Float): Float {
-        if (mSP.isNull()) {
-            return f
-        }
-        return mSP!!.getFloat(key, f)
-    }
+    fun optFloat(key: String, def: Float): Float = runCatching { sp?.getFloat(key, def) ?: def }.getOrDefault(def)
 
     fun clearConfig() {
-        mSPEditor?.clear()?.apply()
+        runCatching { sp?.edit()?.clear()?.apply() }
     }
 }

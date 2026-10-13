@@ -2,9 +2,9 @@
 
 pluginManagement {
     repositories {
-        gradlePluginPortal()
         google()
         mavenCentral()
+        gradlePluginPortal()
     }
 }
 dependencyResolutionManagement {
@@ -12,12 +12,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven("https://maven.aliyun.com/repository/public")
-        maven("https://api.xposed.info/")
     }
 }
 
 include(":app")
-include(":blockmiui")
-include(":xtoast")
 rootProject.name = "Fuck_Home"

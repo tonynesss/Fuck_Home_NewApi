@@ -27,11 +27,15 @@
     <string name="ThkListTips">感谢名单（不分先后）</string>
     <string name="AboutTips">摸鱼</string>
     <string name="Author">作者</string>
+    <string name="OriginalAuthor">原作者</string>
+    <string name="Maintainer">维护者</string>
     <string name="AddInformationStyle">信息样式自定义</string>
     <string name="FunModify">功能调整区</string>
     <string name="Customize">自定义</string>
     <string name="ResetSuccess">重置成功</string>
     <string name="ReStartHome">重启桌面</string>
+    <string name="NeedsRoot">需要 Root 权限</string>
+    <string name="RootRequired">重启桌面需要 Root 权限，请授权后重试</string>
     <string name="Backup">备份配置</string>
     <string name="Recovery">恢复配置</string>
     <string name="ModuleVersion">模块版本</string>

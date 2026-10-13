@@ -31,9 +31,13 @@ import cn.fuckhome.xiaowine.utils.Utils
 import cn.fuckhome.xiaowine.utils.Utils.XConfig
 import cn.fuckhome.xiaowine.utils.Utils.formatSize
 import cn.fuckhome.xiaowine.utils.Utils.isNull
-import com.github.kyuubiran.ezxhelper.init.InitFields.appContext
-import com.github.kyuubiran.ezxhelper.init.InitFields.moduleRes
-import com.github.kyuubiran.ezxhelper.utils.*
+import cn.fuckhome.xiaowine.utils.appContext
+import cn.fuckhome.xiaowine.utils.findConstructor
+import cn.fuckhome.xiaowine.utils.findMethod
+import cn.fuckhome.xiaowine.utils.getObjectAs
+import cn.fuckhome.xiaowine.utils.hookAfter
+import cn.fuckhome.xiaowine.utils.moduleRes
+import cn.fuckhome.xiaowine.utils.putObject
 import java.io.File
 import java.util.*
 import kotlin.math.roundToInt
@@ -63,6 +67,116 @@ object Info : BaseHook() {
 
 
     private val handler by lazy { Handler(Looper.getMainLooper()) }
+
+    /** Optional information rows, in display order. */
+    private val infoKeys = listOf(
+        "MemoryView", "ZarmView", "StorageView", "Uptime", "RunningAppTotal", "RunningServiceTotal",
+    )
+
+    /** Signature of the last applied style, so the one-second tick can skip unchanged work. */
+    private var appliedStyle: String? = null
+
+    /** Last rotation reported by the recents container (0 = portrait). */
+    private var lastRotation = 0
+
+    /**
+     * Re-applies the configured style to the views that already exist.
+     *
+     * LSPosed pushes remote-preference changes into the hooked process, so re-reading the values is
+     * enough to pick up a settings edit — no MiuiHome restart needed. This runs when the recents
+     * panel opens and on every one-second data tick, so a style change shows up immediately while
+     * the panel is open, or the next time it is opened.
+     */
+    private fun applyStyleIfChanged() {
+        if (!::mLinearLayout.isInitialized) return
+
+        val enabled = infoKeys.filter { XConfig.getBoolean(it) }
+        val signature = buildString {
+            append(XConfig.getBgColor()).append('|')
+            append(XConfig.getBgCorners()).append('|')
+            append(XConfig.getGravity()).append('|')
+            append(XConfig.getColor()).append('|')
+            append(XConfig.getBoolean("Warning")).append('|')
+            append(XConfig.getBoolean("CleanMode")).append('|')
+            append(XConfig.getBoolean("Unit")).append('|')
+            append(XConfig.getInt("TopMargin0", 4)).append('|')
+            append(XConfig.getInt("LeftMargin0")).append('|')
+            append(XConfig.getInt("TopMargin1", 5)).append('|')
+            append(XConfig.getInt("LeftMargin1")).append('|')
+            append(enabled.joinToString(","))
+        }
+        if (signature == appliedStyle) return
+        appliedStyle = signature
+
+        syncInfoViews(enabled)
+
+        mLinearLayout.background = GradientDrawable().apply {
+            setColor(Color.parseColor(XConfig.getBgColor()))
+            cornerRadius = XConfig.getBgCorners().toFloat()
+            // The original passed the (not yet laid out) view width here, i.e. a zero-width stroke:
+            // no border. Kept as "no border" explicitly so re-applying after layout cannot draw one.
+        }
+
+        TextViewMaps.values.forEach { view ->
+            view.gravity = XConfig.getGravity()
+            view.textSize = 12f
+            view.marqueeRepeatLimit = -1
+            view.isSingleLine = true
+            view.maxLines = 1
+            Utils.viewColor(view, null)
+        }
+
+        updateMargins()
+    }
+
+    /** Adds / removes information rows so the visible set matches the configuration. */
+    private fun syncInfoViews(enabled: List<String>) {
+        if (TextViewMaps.keys.toList() == enabled) return
+        mLinearLayout.removeAllViews()
+        TextViewMaps.clear()
+        enabled.forEach { name ->
+            val view = TextView(appContext).apply {
+                textSize = 12f
+                marqueeRepeatLimit = -1
+                isSingleLine = true
+                maxLines = 1
+            }
+            mLinearLayout.addView(view)
+            TextViewMaps[name] = view
+        }
+    }
+
+    /** Recomputes the margins for the last known rotation from the current configuration. */
+    private fun updateMargins() {
+        if (!::mLinearLayout.isInitialized) return
+        val useScale = XConfig.getUnit()
+        if (lastRotation == 0) {
+            if (useScale) {
+                topMargin = (10 + XConfig.getInt("TopMargin0", 4) / 100.0 * heightPixels).toInt()
+                leftMargin = (10 + XConfig.getInt("LeftMargin0") / 100.0 * widthPixels).roundToInt()
+            } else {
+                topMargin = 10 + XConfig.getInt("TopMargin0", 4)
+                leftMargin = 10 + XConfig.getInt("LeftMargin0")
+            }
+        } else {
+            if (useScale) {
+                topMargin = (10 + XConfig.getInt("TopMargin1", 5) / 100.0 * widthPixels).roundToInt()
+                leftMargin = (10 + XConfig.getInt("LeftMargin1") / 100.0 * heightPixels).roundToInt()
+            } else {
+                topMargin = 10 + XConfig.getInt("TopMargin1", 5)
+                leftMargin = 10 + XConfig.getInt("LeftMargin1")
+            }
+        }
+
+        mLinearLayout.layoutParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+        ).apply {
+            this.topMargin = this@Info.topMargin
+            this.leftMargin = this@Info.leftMargin
+        }
+    }
+
     override fun init() {
 //        初始化根控件
         Utils.catchNoClass {
@@ -134,26 +248,8 @@ object Info : BaseHook() {
 //        调节边距
         Utils.catchNoClass {
             findMethod("com.miui.home.recents.views.RecentsContainer") { name == "updateRotation" }.hookAfter {
-                val mResentsContainerRotation = it.args[0] as Int
-                if (mResentsContainerRotation == 0) {
-                    if (XConfig.getUnit()) {
-                        topMargin = (10 + XConfig.getInt("TopMargin0", 4) / 100.0 * heightPixels).toInt()
-                        leftMargin = (10 + XConfig.getInt("LeftMargin0") / 100.0 * widthPixels).roundToInt()
-                    } else {
-                        LogUtils.i(XConfig.getInt("TopMargin0", 4))
-                        topMargin = 10 + XConfig.getInt("TopMargin0", 4)
-                        leftMargin = 10 + XConfig.getInt("LeftMargin0")
-                    }
-                } else {
-                    if (XConfig.getUnit()) {
-                        topMargin = (10 + XConfig.getInt("TopMargin1", 5) / 100.0 * widthPixels).roundToInt()
-                        leftMargin = (10 + XConfig.getInt("LeftMargin1") / 100.0 * heightPixels).roundToInt()
-                    } else {
-                        topMargin = 10 + XConfig.getInt("TopMargin1", 5)
-                        leftMargin = 10 + XConfig.getInt("LeftMargin1")
-                    }
-
-                }
+                lastRotation = it.args[0] as Int
+                updateMargins()
             }
         }
 
@@ -162,10 +258,8 @@ object Info : BaseHook() {
         Utils.catchNoClass {
             findMethod("com.miui.home.recents.views.RecentsContainer") { name == "startRecentsContainerFadeInAnim" }.hookAfter {
                 LogUtils.i(moduleRes.getString(R.string.VisibleView))
-                val params = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT)
-                params.topMargin = topMargin
-                params.leftMargin = leftMargin
-                mLinearLayout.layoutParams = params
+                // Pick up any settings change before the panel becomes visible.
+                applyStyleIfChanged()
                 LogUtils.i(moduleRes.getString(R.string.UpdateView))
 
                 val animation = AlphaAnimation(0f, 1f)
@@ -213,6 +307,8 @@ object Info : BaseHook() {
     fun updateInfoDate() {
         LogUtils.i("更新数据")
         handler.post {
+            // Live style: the tick also re-applies a changed configuration to the existing views.
+            applyStyleIfChanged()
             val memoryInfo = MemoryUtils().getMemoryInfo(appContext)
             val swapInfo = MemoryUtils().getPartitionInfo("SwapTotal", "SwapFree")
             val storageInfo = MemoryUtils().getStorageInfo(Environment.getExternalStorageDirectory())

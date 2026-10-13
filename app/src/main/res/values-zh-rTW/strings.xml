@@ -28,11 +28,15 @@
     <string name="ThkListTips">感謝名單（不分先後）</string>
     <string name="AboutTips">摸魚</string>
     <string name="Author">作者</string>
+    <string name="OriginalAuthor">原作者</string>
+    <string name="Maintainer">維護者</string>
     <string name="AddInformationStyle">資訊樣式自定義</string>
     <string name="FunModify">功能調整區</string>
     <string name="Customize">自定義</string>
     <string name="ResetSuccess">重置成功</string>
     <string name="ReStartHome">重新啟動桌面</string>
+    <string name="NeedsRoot">需要 Root 權限</string>
+    <string name="RootRequired">重新啟動桌面需要 Root 權限，請授權後重試</string>
     <string name="Backup">備份配置</string>
     <string name="Recovery">恢復配置</string>
     <string name="ModuleVersion">模組版本</string>

@@ -8,3 +8,34 @@
 .externalNativeBuild
 .cxx
 local.properties
+# Signing secrets — keep the keystore and its passwords out of the repository.
+keystore.properties
+*.jks
+*.keystore
+*.p12
+*.pem
+*.pk8
+# Kotlin 编译器会话目录
+.kotlin
+
+# ---------------------------------------------------------------------------
+# 本地工具产生的文件，一律不进仓库
+# ---------------------------------------------------------------------------
+# AI/编辑器会话与标记文件
+.dsh/
+.dsh*
+*.dsh
+# 日志
+*.log
+logs/
+# 对话 / 会话记录
+*.jsonl
+session*.json
+conversation/
+conversations/
+transcript/
+transcripts/
+# 本地密钥与配置
+.env
+.env.*
+secrets.properties

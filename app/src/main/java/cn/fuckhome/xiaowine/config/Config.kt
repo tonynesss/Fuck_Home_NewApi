@@ -4,23 +4,25 @@ package cn.fuckhome.xiaowine.config
 import android.content.SharedPreferences
 import android.view.Gravity
 import cn.fuckhome.xiaowine.utils.ConfigUtils
-import de.robv.android.xposed.XSharedPreferences
 
+/**
+ * Typed view over the module configuration.
+ *
+ * Both the settings UI and the hooks use this class: the UI passes the mirrored
+ * preferences from [cn.fuckhome.xiaowine.utils.ModulePrefs], while the hooks pass the
+ * read-only remote preferences supplied by the framework. A `null` store means "no
+ * configuration available", in which case every getter returns its default value.
+ */
 class Config {
-    private var config: ConfigUtils
+    private val config: ConfigUtils
 
-    constructor(xSharedPreferences: XSharedPreferences?) {
-        config = ConfigUtils(xSharedPreferences)
-    }
-
-    constructor(sharedPreferences: SharedPreferences) {
+    constructor(sharedPreferences: SharedPreferences?) {
         config = ConfigUtils(sharedPreferences)
     }
 
     fun update() {
         config.update()
     }
-
 
 
     fun setColor(str: String) {
