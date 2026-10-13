@@ -1,18 +1,17 @@
 name: Android CI
 
+# 手动触发，只做编译检查。
+#
+# 与原版工作流的区别（原版见 8e73949 之前的历史）：
+#   - 原版在 push 到 master 时自动运行，用维护者的密钥（alias xiao_wine）签名，
+#     上传 APK artifacts，并用 BOT_TOKEN 把包发到 Telegram 频道；
+#   - fork 不会继承上游的 secrets，而且「等待原作者授权期间不发布成品」是当前意图，
+#     所以这些步骤全部移除，改为仅手动触发的编译检查。
+#   - 拿到授权后若想让 CI 签名并产出 APK，参考 git 历史里的旧版工作流。
+#
+# 注意：本工作流依赖 compileSdk 37 / build-tools 37，未在 GitHub Runner 上实测过。
 on:
-  push:
-    branches: [ master ]
   workflow_dispatch:
-    inputs:
-      run:
-        description: ""
-        required: true
-        default: run
-        type: choice
-        options:
-          - run
-
 
 jobs:
   build:
@@ -20,6 +19,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - name: set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -31,71 +31,11 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            !~/.gradle/caches/build-cache-*
           key: gradle-deps-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: gradle-deps
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build with Gradle
-        run: |
-          bash ./gradlew assembleRelease
-          bash ./gradlew assembleDebug
-
-      - name: Sign Release APK
-        if: success()
-        id: sign_release
-        uses: r0adkll/sign-android-release@v1.0.4
-        with:
-          releaseDirectory: ./app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-          alias: xiao_wine
-          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_STORE_PASSWORD }}
-
-      - name: Sign Debug APK
-        if: success()
-        id: sign_debug
-        uses: r0adkll/sign-android-release@v1.0.4
-        with:
-          releaseDirectory: ./app/build/outputs/apk/debug
-          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-          alias: xiao_wine
-          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_STORE_PASSWORD }}
-
-      - name: Upload Release APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: InkHome_release
-          path: ${{ steps.sign_release.outputs.signedReleaseFile }}
-
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: InkHome_debug
-          path: ${{ steps.sign_debug.outputs.signedReleaseFile }}
-
-      - name: Upload Release Mapping
-        uses: actions/upload-artifact@v4
-        with:
-          name: InkHone_release_mapping
-          path: ./app/build/outputs/mapping/release/mapping.txt
-
-
-      - name: Post to channel
-        if: contains(github.event.head_commit.message, '[skip post]') == false
-        env:
-          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          RELEASE: ${{ steps.sign_release.outputs.signedReleaseFile }}
-          DEBUG: ${{ steps.sign_debug.outputs.signedReleaseFile }}
-          COMMIT_MESSAGE: |+
-            Github CI
-            ```
-            ${{ github.event.head_commit.message }}
-            ```
-        run: |
-          ESCAPED=`python3 -c 'import json,os,urllib.parse; print(urllib.parse.quote(json.dumps(os.environ["COMMIT_MESSAGE"])))'`
-          curl -v "https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup?chat_id=${CHANNEL_ID}&media=%5B%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2Frelease%22%7D%2C%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2Fdebug%22%2C%22parse_mode%22%3A%22MarkdownV2%22%2C%22caption%22%3A${ESCAPED}%7D%5D" -F release="@$RELEASE" -F debug="@$DEBUG"
+      - name: Build
+        run: ./gradlew assembleDebug assembleRelease
